@@ -6,14 +6,17 @@ from app.detectors.base import Detection
 class RegexSecretDetector:
     name = "regex_secret"
 
+    ASCII_BOUNDARY_LEFT = r"(?<![A-Za-z0-9_])"
+    ASCII_BOUNDARY_RIGHT = r"(?![A-Za-z0-9_])"
+
     PATTERNS: dict[str, re.Pattern[str]] = {
-        "openai_key": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b"),
-        "github_token": re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b"),
-        "aws_access_key": re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
-        "aws_secret": re.compile(r"(?i)\baws(?:_|\s|-)?(?:secret|secret_access_key)\b\s*[:=]\s*['\"]?[A-Za-z0-9/+=]{30,}['\"]?"),
-        "anthropic_key": re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b"),
-        "deepseek_key": re.compile(r"\bsk-[A-Za-z0-9]{32,}\b"),
-        "slack_token": re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{20,}\b"),
+        "openai_key": re.compile(rf"{ASCII_BOUNDARY_LEFT}sk-(?:proj-)?[A-Za-z0-9_-]{{20,}}{ASCII_BOUNDARY_RIGHT}"),
+        "github_token": re.compile(rf"{ASCII_BOUNDARY_LEFT}gh[pousr]_[A-Za-z0-9_]{{20,}}{ASCII_BOUNDARY_RIGHT}"),
+        "aws_access_key": re.compile(rf"{ASCII_BOUNDARY_LEFT}(?:AKIA|ASIA)[A-Z0-9]{{16}}{ASCII_BOUNDARY_RIGHT}"),
+        "aws_secret": re.compile(rf"(?i){ASCII_BOUNDARY_LEFT}aws(?:_|\s|-)?(?:secret|secret_access_key){ASCII_BOUNDARY_RIGHT}\s*[:=]\s*['\"]?[A-Za-z0-9/+=]{{30,}}['\"]?"),
+        "anthropic_key": re.compile(rf"{ASCII_BOUNDARY_LEFT}sk-ant-[A-Za-z0-9_-]{{20,}}{ASCII_BOUNDARY_RIGHT}"),
+        "deepseek_key": re.compile(rf"{ASCII_BOUNDARY_LEFT}sk-[A-Za-z0-9]{{32,}}{ASCII_BOUNDARY_RIGHT}"),
+        "slack_token": re.compile(rf"{ASCII_BOUNDARY_LEFT}xox[baprs]-[A-Za-z0-9-]{{20,}}{ASCII_BOUNDARY_RIGHT}"),
     }
 
     def detect(self, text: str) -> list[Detection]:

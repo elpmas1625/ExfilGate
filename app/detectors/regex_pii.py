@@ -7,8 +7,8 @@ class RegexPIIDetector:
     name = "regex_pii"
 
     PATTERNS: dict[str, re.Pattern[str]] = {
-        "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
-        "phone": re.compile(r"(?<!\w)(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{2,4}\)?[-.\s]?)?\d{3,4}[-.\s]?\d{4}(?!\w)"),
+        "email": re.compile(r"(?<![A-Za-z0-9_])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![A-Za-z0-9_])"),
+        "phone": re.compile(r"(?<![A-Za-z0-9_])(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{2,4}\)?[-.\s]?)?\d{3,4}[-.\s]?\d{4}(?![A-Za-z0-9_])"),
     }
 
     def detect(self, text: str) -> list[Detection]:

@@ -10,7 +10,7 @@ Prerequisites:
 
 - Python 3.12+
 - `uv`
-- A DeepSeek API key in `DEEPSEEK_API_KEY`
+- An API key for an OpenAI-compatible provider in `AICF_PROVIDER_API_KEY`
 
 Prepare environment variables:
 
@@ -18,7 +18,8 @@ Prepare environment variables:
 cp .env.example .env
 ```
 
-Edit `.env` and set `DEEPSEEK_API_KEY`.
+Edit `.env` and set `AICF_PROVIDER_API_KEY`. If your provider does not use
+`https://api.openai.com/v1`, also set `AICF_PROVIDER_BASE_URL`.
 
 Install dependencies:
 
@@ -88,7 +89,6 @@ Authorization headers, or provider API keys.
 - Masking is intentionally limited to message text fields and response message content
 - Redis is present only as an optional Compose service and is not used by the MVP runtime
 - Audit logging is JSONL only; SQLite and PostgreSQL are future extensions
-- Docker build and Compose runtime verification must be rerun after the local Colima/Docker daemon is healthy
 
 ## Next Phase
 
@@ -101,23 +101,27 @@ Authorization headers, or provider API keys.
 - Add agent-aware scanning for tool outputs, MCP results, grep output, and terminal output
 - Add rate limiting, async scan workers, and detector result caching if Redis becomes required
 
-## DeepSeek Configuration
+## Provider Configuration
 
-`examples/config.yaml` is configured for DeepSeek's OpenAI-compatible API:
+`examples/config.yaml` is configured for a generic OpenAI-compatible API:
 
 ```yaml
 provider:
-  name: deepseek
-  base_url: https://api.deepseek.com
-  api_key_env: DEEPSEEK_API_KEY
+  name: openai-compatible
+  base_url: https://api.openai.com/v1
+  api_key_env: AICF_PROVIDER_API_KEY
   timeout_seconds: 60
 ```
 
-The sample request uses `deepseek-v4-flash`:
+Set `AICF_PROVIDER_BASE_URL` when using another OpenAI-compatible provider.
+DeepSeek-specific settings are available in `examples/config.deepseek.yaml`.
+
+The sample request uses a placeholder model name. Replace it with a model
+supported by your provider:
 
 ```json
 {
-  "model": "deepseek-v4-flash",
+  "model": "replace-with-provider-model",
   "messages": [
     {
       "role": "user",
@@ -141,7 +145,7 @@ Run the API:
 ```bash
 AICF_CONFIG=examples/config.yaml \
 AICF_AUDIT_PATH=./data/audit.jsonl \
-DEEPSEEK_API_KEY=your_key \
+AICF_PROVIDER_API_KEY=your_key \
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -162,7 +166,7 @@ curl http://localhost:8000/v1/chat/completions \
 ## Docker Compose
 
 ```bash
-DEEPSEEK_API_KEY=your_key docker compose up --build firewall
+AICF_PROVIDER_API_KEY=your_key docker compose up --build firewall
 ```
 
 The audit log is persisted in the `aicf_data` volume at `/data/audit.jsonl`.
@@ -172,17 +176,8 @@ Redis is present under the optional profile and is not required for the MVP:
 docker compose --profile optional up redis
 ```
 
-Known limitation: Docker build and `docker compose up` verification could not be
-completed in the current local environment because Colima reported an invalid
-runtime state and the Docker socket was unavailable:
-
-```text
-failed to connect to the docker API at unix:///Users/elpmas/.colima/default/docker.sock
-error retrieving current runtime: empty value
-```
-
-This is an environment issue, not a known application failure. Re-run the Docker
-commands after Colima is repaired or Docker Desktop is available.
+For a provider other than `https://api.openai.com/v1`, set
+`AICF_PROVIDER_BASE_URL` as well.
 
 ## OpenCode Connection
 
@@ -191,11 +186,11 @@ Configure the AI coding tool to use this firewall as an OpenAI-compatible base U
 ```text
 base_url: http://localhost:8000/v1
 api_key: any non-empty value accepted by the client
-model: deepseek-v4-flash
+model: a model supported by your upstream provider
 ```
 
 The firewall uses the provider API key configured by `provider.api_key_env` in
-`examples/config.yaml`, for example `DEEPSEEK_API_KEY`.
+`examples/config.yaml`, defaulting to `AICF_PROVIDER_API_KEY`.
 
 Example OpenCode config:
 
@@ -210,19 +205,19 @@ Example OpenCode config:
         "baseURL": "http://localhost:8000/v1"
       },
       "models": {
-        "deepseek-v4-flash": {
-          "name": "DeepSeek V4 Flash via ExfilGate"
+        "replace-with-provider-model": {
+          "name": "Provider Model via ExfilGate"
         }
       }
     }
   },
-  "model": "exfilgate/deepseek-v4-flash"
+  "model": "exfilgate/replace-with-provider-model"
 }
 ```
 
 If OpenCode asks for credentials through `/connect`, enter a local placeholder
 value. ExfilGate does not use that client-side key for upstream authentication;
-it reads the real upstream key from `DEEPSEEK_API_KEY`.
+it reads the real upstream key from `AICF_PROVIDER_API_KEY` by default.
 
 ## Policy
 

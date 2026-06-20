@@ -1,5 +1,5 @@
 {
-  "model": "deepseek-v4-flash",
+  "model": "replace-with-provider-model",
   "messages": [
     {
       "role": "user",

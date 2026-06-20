@@ -4,10 +4,10 @@ services:
     ports:
       - "8000:8000"
     environment:
-      AICF_CONFIG: /app/examples/config.yaml
-      AICF_AUDIT_PATH: /data/audit.jsonl
+      AICF_CONFIG: ${AICF_CONFIG:-/app/examples/config.yaml}
+      AICF_AUDIT_PATH: ${AICF_AUDIT_PATH:-/data/audit.jsonl}
       AICF_PROVIDER_BASE_URL: ${AICF_PROVIDER_BASE_URL:-}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      AICF_PROVIDER_API_KEY: ${AICF_PROVIDER_API_KEY:-}
     volumes:
       - ./examples:/app/examples:ro
       - aicf_data:/data

@@ -3,9 +3,9 @@ server:
   port: 8000
 
 provider:
-  name: openai-compatible
-  base_url: https://api.openai.com/v1
-  api_key_env: AICF_PROVIDER_API_KEY
+  name: deepseek
+  base_url: https://api.deepseek.com
+  api_key_env: DEEPSEEK_API_KEY
   timeout_seconds: 60
 
 audit:
