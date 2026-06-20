@@ -1,0 +1,21 @@
+services:
+  firewall:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      AICF_CONFIG: /app/examples/config.yaml
+      AICF_AUDIT_PATH: /data/audit.jsonl
+      AICF_PROVIDER_BASE_URL: ${AICF_PROVIDER_BASE_URL:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+    volumes:
+      - ./examples:/app/examples:ro
+      - aicf_data:/data
+
+  redis:
+    image: redis:7-alpine
+    profiles:
+      - optional
+
+volumes:
+  aicf_data:

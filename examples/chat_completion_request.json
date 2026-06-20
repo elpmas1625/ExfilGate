@@ -1,0 +1,10 @@
+{
+  "model": "deepseek-v4-flash",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Write a short hello world in Python."
+    }
+  ],
+  "stream": false
+}
