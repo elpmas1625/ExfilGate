@@ -1,0 +1,36 @@
+server:
+  host: 0.0.0.0
+  port: 8000
+
+provider:
+  name: lmstudio
+  base_url: http://127.0.0.1:1234/v1
+  api_key_env: AICF_PROVIDER_API_KEY
+  timeout_seconds: 600
+
+audit:
+  type: jsonl
+  path: ./data/audit.jsonl
+
+detectors:
+  regex_secrets:
+    enabled: true
+  gitleaks:
+    enabled: false
+    timeout_seconds: 3
+  regex_pii:
+    enabled: true
+
+policy:
+  default_action: allow
+  rules:
+    openai_key: block
+    github_token: block
+    aws_access_key: block
+    aws_secret: block
+    anthropic_key: block
+    deepseek_key: block
+    slack_token: block
+    secret: block
+    email: mask
+    phone: mask

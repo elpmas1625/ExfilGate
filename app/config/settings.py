@@ -53,6 +53,11 @@ class PolicySettings(BaseModel):
     rules: dict[str, Literal["allow", "warn", "mask", "block"]] = Field(default_factory=dict)
 
 
+class StreamSettings(BaseModel):
+    heartbeat_interval_seconds: float = 15.0
+    heartbeat_mode: Literal["comment", "empty_delta"] = "comment"
+
+
 class Settings(BaseModel):
     server: ServerSettings = Field(default_factory=ServerSettings)
     provider: ProviderSettings = Field(default_factory=ProviderSettings)
@@ -60,6 +65,7 @@ class Settings(BaseModel):
     detectors: DetectorSettings = Field(default_factory=DetectorSettings)
     limits: LimitSettings = Field(default_factory=LimitSettings)
     policy: PolicySettings = Field(default_factory=PolicySettings)
+    stream: StreamSettings = Field(default_factory=StreamSettings)
 
 
 def load_settings() -> Settings:
@@ -70,4 +76,10 @@ def load_settings() -> Settings:
         settings.audit.path = os.environ["AICF_AUDIT_PATH"]
     if os.getenv("AICF_PROVIDER_BASE_URL"):
         settings.provider.base_url = os.environ["AICF_PROVIDER_BASE_URL"]
+    if os.getenv("AICF_STREAM_HEARTBEAT_INTERVAL_SECONDS"):
+        settings.stream.heartbeat_interval_seconds = float(os.environ["AICF_STREAM_HEARTBEAT_INTERVAL_SECONDS"])
+    if os.getenv("AICF_STREAM_HEARTBEAT_MODE"):
+        heartbeat_mode = os.environ["AICF_STREAM_HEARTBEAT_MODE"]
+        if heartbeat_mode in ("comment", "empty_delta"):
+            settings.stream.heartbeat_mode = heartbeat_mode
     return settings

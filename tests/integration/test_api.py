@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -12,6 +14,7 @@ from app.config.settings import (
     PolicySettings,
     ProviderSettings,
     Settings,
+    StreamSettings,
 )
 from app.detectors.regex_pii import RegexPIIDetector
 from app.detectors.regex_secret import RegexSecretDetector
@@ -43,7 +46,20 @@ class ErrorProvider:
         raise self.error
 
 
-def make_settings(audit_path: str, *, max_request_bytes: int = 1048576, max_response_bytes: int = 1048576) -> Settings:
+class SlowProvider(FakeProvider):
+    async def chat_completions(self, payload: dict) -> dict:
+        self.payload = payload
+        await asyncio.sleep(0.03)
+        return self.response
+
+
+def make_settings(
+    audit_path: str,
+    *,
+    max_request_bytes: int = 1048576,
+    max_response_bytes: int = 1048576,
+    heartbeat_interval_seconds: float = 15.0,
+) -> Settings:
     return Settings(
         provider=ProviderSettings(name="test", base_url="https://example.test/v1", api_key_env="NO_KEY"),
         audit=AuditSettings(path=audit_path),
@@ -61,6 +77,7 @@ def make_settings(audit_path: str, *, max_request_bytes: int = 1048576, max_resp
                 "phone": "mask",
             },
         ),
+        stream=StreamSettings(heartbeat_interval_seconds=heartbeat_interval_seconds),
     )
 
 
@@ -90,16 +107,91 @@ def client(client_factory):
     return client_factory()
 
 
-def test_streaming_is_rejected(client) -> None:
-    test_client, _ = client
+def test_streaming_request_returns_sse_and_forces_upstream_non_stream(client) -> None:
+    test_client, fake_provider = client
 
     response = test_client.post(
         "/v1/chat/completions",
         json={"model": "test", "messages": [{"role": "user", "content": "hello"}], "stream": True},
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"]["code"] == "streaming_not_supported"
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert '"content":"ok"' in response.text
+    assert "data: [DONE]" in response.text
+    assert fake_provider.payload["stream"] is False
+
+
+def test_streaming_request_sends_comment_heartbeat(client_factory, tmp_path) -> None:
+    settings = make_settings(str(tmp_path / "audit.jsonl"), heartbeat_interval_seconds=0.01)
+    test_client, _ = client_factory(provider=SlowProvider(), settings=settings)
+
+    response = test_client.post(
+        "/v1/chat/completions",
+        json={"model": "test", "messages": [{"role": "user", "content": "hello"}], "stream": True},
+    )
+
+    assert response.status_code == 200
+    assert ": ping\n\n" in response.text
+    assert "data: [DONE]" in response.text
+
+
+def test_streaming_request_policy_block_still_returns_json_403(client) -> None:
+    test_client, fake_provider = client
+
+    response = test_client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "test",
+            "messages": [{"role": "user", "content": "sk-proj-abcdefghijklmnopqrstuvwxyz1234567890"}],
+            "stream": True,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "content_blocked"
+    assert fake_provider.payload is None
+
+
+def test_streaming_response_policy_block_returns_sse_error(client_factory) -> None:
+    provider = FakeProvider(
+        response={
+            "id": "chatcmpl_test",
+            "object": "chat.completion",
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "leaked sk-proj-abcdefghijklmnopqrstuvwxyz1234567890",
+                    }
+                }
+            ],
+        }
+    )
+    test_client, _ = client_factory(provider=provider)
+
+    response = test_client.post(
+        "/v1/chat/completions",
+        json={"model": "test", "messages": [{"role": "user", "content": "hello"}], "stream": True},
+    )
+
+    assert response.status_code == 200
+    assert '"code":"content_blocked"' in response.text
+    assert "data: [DONE]" in response.text
+
+
+def test_streaming_provider_error_returns_sse_error(client_factory) -> None:
+    provider = ErrorProvider(ProviderError(status_code=502))
+    test_client, _ = client_factory(provider=provider)
+
+    response = test_client.post(
+        "/v1/chat/completions",
+        json={"model": "test", "messages": [{"role": "user", "content": "hello"}], "stream": True},
+    )
+
+    assert response.status_code == 200
+    assert '"code":"provider_error"' in response.text
+    assert "data: [DONE]" in response.text
 
 
 def test_request_secret_is_blocked(client) -> None:
