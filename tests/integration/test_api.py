@@ -68,7 +68,7 @@ def make_settings(
         audit=AuditSettings(path=audit_path),
         detectors=DetectorSettings(
             regex_secrets=EnabledDetectorSettings(enabled=True),
-            gitleaks=GitleaksSettings(enabled=False),
+            gitleaks=GitleaksSettings(enabled=True),
             regex_pii=EnabledDetectorSettings(enabled=True),
         ),
         limits=LimitSettings(max_request_bytes=max_request_bytes, max_response_bytes=max_response_bytes, max_scan_chars=10000),

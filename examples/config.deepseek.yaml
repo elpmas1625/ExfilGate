@@ -16,7 +16,7 @@ detectors:
   regex_secrets:
     enabled: true
   gitleaks:
-    enabled: false
+    enabled: true
     timeout_seconds: 3
   regex_pii:
     enabled: true

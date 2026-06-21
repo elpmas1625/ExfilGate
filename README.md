@@ -59,7 +59,7 @@ Audit events are written to `./data/audit.jsonl` when using `.env.example`.
 - Audit log: JSONL by default at `/data/audit.jsonl`
 - Streaming: supported for `stream: true` by calling the upstream provider with a non-streaming request, then converting the completed response into OpenAI-compatible SSE chunks.
 - PII detection: Regex email and phone only
-- Secret detection: Regex required, Gitleaks optional and disabled by default
+- Secret detection: Regex required, Gitleaks enabled by default
 - Future extension points: Headroom, Presidio, GLiNER, SQLite, PostgreSQL
 
 Audit logs never store prompt text, response text, secret values, PII values,
@@ -75,9 +75,9 @@ Authorization headers, or provider API keys.
 - Policy actions: `allow`, `warn`, `mask`, `block`
 - OpenAI-compatible error objects for blocked content, invalid JSON, unsupported streaming, and size limits
 - JSONL audit logging with sanitized metadata only
-- Optional Gitleaks adapter, disabled by default
+- Gitleaks adapter, enabled by default
 - Provider abstraction with a Headroom extension stub
-- Dockerfile and Docker Compose for self-hosting
+- Dockerfile and Docker Compose for self-hosting, including the Gitleaks CLI
 
 ## v0.1 Limits
 
@@ -85,7 +85,7 @@ Authorization headers, or provider API keys.
 - Streaming is rejected with `streaming_not_supported`
 - Only OpenAI-compatible HTTP providers are supported
 - PII detection is limited to email and phone regexes
-- Gitleaks is optional; v0.1 does not parse Gitleaks JSON findings into detailed detection types
+- Gitleaks uses the CLI adapter; v0.1 does not parse Gitleaks JSON findings into detailed detection types
 - Masking is intentionally limited to message text fields and response message content
 - Redis is present only as an optional Compose service and is not used by the MVP runtime
 - Audit logging is JSONL only; SQLite and PostgreSQL are future extensions
@@ -284,8 +284,9 @@ Policy blocks return:
 
 ## Gitleaks
 
-Gitleaks is optional and disabled by default. If enabled but the `gitleaks` CLI is
-not installed, ExfilGate emits a sanitized warning and continues running.
+Gitleaks is enabled by default. The Docker image includes the `gitleaks` CLI.
+If the CLI is not installed in a non-Docker environment, ExfilGate emits a
+sanitized warning and continues running.
 
 ```yaml
 detectors:

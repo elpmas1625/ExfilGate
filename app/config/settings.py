@@ -32,7 +32,7 @@ class EnabledDetectorSettings(BaseModel):
 
 
 class GitleaksSettings(BaseModel):
-    enabled: bool = False
+    enabled: bool = True
     timeout_seconds: float = 3.0
 
 
