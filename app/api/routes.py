@@ -22,6 +22,8 @@ from app.detectors.gitleaks import GitleaksDetector
 from app.detectors.regex_pii import RegexPIIDetector
 from app.detectors.regex_secret import RegexSecretDetector
 from app.policy.engine import PolicyEngine
+from app.providers.base import ProviderClient
+from app.providers.headroom import HeadroomProviderClient
 from app.providers.openai_compatible import OpenAICompatibleProviderClient, ProviderError
 from app.scanning.service import ScanService
 
@@ -29,7 +31,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def build_runtime() -> tuple[Settings, JsonlAuditLogger, ScanService, PolicyEngine, OpenAICompatibleProviderClient]:
+def build_runtime() -> tuple[Settings, JsonlAuditLogger, ScanService, PolicyEngine, ProviderClient]:
     settings = load_settings()
     detectors = []
     if settings.detectors.regex_secrets.enabled:
@@ -39,12 +41,17 @@ def build_runtime() -> tuple[Settings, JsonlAuditLogger, ScanService, PolicyEngi
     if settings.detectors.gitleaks.enabled:
         detectors.append(GitleaksDetector(timeout_seconds=settings.detectors.gitleaks.timeout_seconds))
 
+    if settings.provider.name == "headroom":
+        provider: ProviderClient = HeadroomProviderClient(settings.provider)
+    else:
+        provider = OpenAICompatibleProviderClient(settings.provider)
+
     return (
         settings,
         JsonlAuditLogger(settings.audit.path),
         ScanService(detectors=detectors, max_scan_chars=settings.limits.max_scan_chars),
         PolicyEngine(settings.policy),
-        OpenAICompatibleProviderClient(settings.provider),
+        provider,
     )
 
 
@@ -205,7 +212,7 @@ async def stream_chat_completions(
     audit_logger: JsonlAuditLogger,
     scanner: ScanService,
     policy: PolicyEngine,
-    provider: OpenAICompatibleProviderClient,
+    provider: ProviderClient,
     request_id: str,
     upstream_payload: dict[str, Any],
 ) -> AsyncIterator[str]:
@@ -493,4 +500,12 @@ async def chat_completions(request: Request) -> Response:
     if response_decision.should_mask:
         response_payload = scanner.mask_response(upstream_response, response_result.detections)
 
-    return JSONResponse(status_code=200, content=response_payload)
+    headers: dict[str, str] = {}
+    if isinstance(provider, HeadroomProviderClient) and provider.last_compression is not None:
+        c = provider.last_compression
+        headers["X-Headroom-Tokens-Before"] = str(c.tokens_before)
+        headers["X-Headroom-Tokens-After"] = str(c.tokens_after)
+        headers["X-Headroom-Tokens-Saved"] = str(c.tokens_saved)
+        headers["X-Headroom-Compression-Ratio"] = f"{c.compression_ratio:.3f}"
+        headers["X-Headroom-Transforms"] = ",".join(c.transforms_applied)
+    return JSONResponse(status_code=200, content=response_payload, headers=headers)

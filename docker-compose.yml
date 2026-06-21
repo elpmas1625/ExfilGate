@@ -13,6 +13,23 @@ services:
       - ./examples:/app/examples:ro
       - aicf_data:/data
 
+  headroom:
+    image: ghcr.io/headroom-ai/headroom:latest
+    ports:
+      - "8787:8787"
+    profiles:
+      - headroom
+      - all
+    environment:
+      HEADROOM_BACKEND: anthropic
+      HEADROOM_LOG_FILE: /data/proxy.jsonl
+      HEADROOM_PORT: 8787
+      HEADROOM_HOST: 0.0.0.0
+      ANTHROPIC_API_KEY: ${HEADROOM_ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${HEADROOM_OPENAI_API_KEY:-}
+    volumes:
+      - headroom_data:/data
+
   redis:
     image: redis:7-alpine
     profiles:
@@ -20,3 +37,4 @@ services:
 
 volumes:
   aicf_data:
+  headroom_data:
