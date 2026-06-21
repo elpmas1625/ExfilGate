@@ -23,6 +23,9 @@ from app.policy.engine import PolicyEngine
 from app.providers.openai_compatible import ProviderError
 from app.scanning.service import ScanService
 
+DUMMY_OPENAI_KEY = "sk-" + "proj-" + "a" * 36
+DUMMY_GITHUB_TOKEN = "gh" + "p_" + "a" * 36
+
 
 class FakeProvider:
     def __init__(self, response: dict | None = None) -> None:
@@ -143,7 +146,7 @@ def test_streaming_request_policy_block_still_returns_json_403(client) -> None:
         "/v1/chat/completions",
         json={
             "model": "test",
-            "messages": [{"role": "user", "content": "sk-proj-abcdefghijklmnopqrstuvwxyz1234567890"}],
+            "messages": [{"role": "user", "content": DUMMY_OPENAI_KEY}],
             "stream": True,
         },
     )
@@ -162,7 +165,7 @@ def test_streaming_response_policy_block_returns_sse_error(client_factory) -> No
                 {
                     "message": {
                         "role": "assistant",
-                        "content": "leaked sk-proj-abcdefghijklmnopqrstuvwxyz1234567890",
+                        "content": f"leaked {DUMMY_OPENAI_KEY}",
                     }
                 }
             ],
@@ -201,7 +204,7 @@ def test_request_secret_is_blocked(client) -> None:
         "/v1/chat/completions",
         json={
             "model": "test",
-            "messages": [{"role": "user", "content": "sk-proj-abcdefghijklmnopqrstuvwxyz1234567890"}],
+            "messages": [{"role": "user", "content": DUMMY_OPENAI_KEY}],
         },
     )
 
@@ -231,7 +234,7 @@ def test_response_secret_is_blocked(client_factory) -> None:
                 {
                     "message": {
                         "role": "assistant",
-                        "content": "leaked sk-proj-abcdefghijklmnopqrstuvwxyz1234567890",
+                        "content": f"leaked {DUMMY_OPENAI_KEY}",
                     }
                 }
             ],
@@ -323,3 +326,92 @@ def test_response_size_limit_returns_502(client_factory, tmp_path) -> None:
 
     assert response.status_code == 502
     assert response.json()["error"]["code"] == "upstream_response_too_large"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"messages": "not-a-list"},
+        {"messages": [{"role": "user", "content": {"unexpected": "shape"}}]},
+    ],
+)
+def test_invalid_request_payloads_return_400_without_provider_call(client_factory, body) -> None:
+    fake_provider = FakeProvider()
+    client, _ = client_factory(provider=fake_provider)
+
+    response = client.post("/v1/chat/completions", json=body)
+
+    assert response.status_code == 400
+    assert response.json()["error"]["type"] == "invalid_request_error"
+    assert fake_provider.payload is None
+
+
+def test_invalid_json_returns_400_without_provider_call(client_factory) -> None:
+    fake_provider = FakeProvider()
+    client, _ = client_factory(provider=fake_provider)
+
+    response = client.post(
+        "/v1/chat/completions",
+        content="{",
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["type"] == "invalid_request_error"
+    assert fake_provider.payload is None
+
+
+def test_oversized_request_returns_413_without_provider_call(client_factory, tmp_path) -> None:
+    fake_provider = FakeProvider()
+    settings = make_settings(str(tmp_path / "audit.jsonl"), max_request_bytes=10)
+    client, _ = client_factory(provider=fake_provider, settings=settings)
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={"messages": [{"role": "user", "content": "hello"}]},
+    )
+
+    assert response.status_code == 413
+    assert fake_provider.payload is None
+
+
+def test_blocked_mixed_request_does_not_call_provider(client_factory) -> None:
+    fake_provider = FakeProvider()
+    client, _ = client_factory(provider=fake_provider)
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                f"key {DUMMY_OPENAI_KEY} "
+                                f"token {DUMMY_GITHUB_TOKEN} "
+                                "email alice@example.com phone 415 555 1212"
+                            ),
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "https://example.com/alice@example.com.png"},
+                        },
+                    ],
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {"name": "lookup", "arguments": "{\"email\":\"alice@example.com\"}"},
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "content_blocked"
+    assert fake_provider.payload is None

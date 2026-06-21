@@ -304,6 +304,31 @@ async def stream_chat_completions(
             yield sse_data("[DONE]")
 
 
+def validate_chat_completion_payload(payload: Any) -> tuple[str, str] | None:
+    if not isinstance(payload, dict):
+        return ("Request body must be a JSON object.", "body")
+
+    messages = payload.get("messages")
+    if not isinstance(messages, list):
+        return ("'messages' must be a list.", "messages")
+
+    for index, message in enumerate(messages):
+        if not isinstance(message, dict):
+            return ("Each message must be an object.", f"messages.{index}")
+
+        content = message.get("content")
+        if content is None or isinstance(content, str):
+            continue
+        if isinstance(content, list):
+            if all(isinstance(item, dict) for item in content):
+                continue
+            return ("Message content parts must be objects.", f"messages.{index}.content")
+
+        return ("Message content must be a string or list of content parts.", f"messages.{index}.content")
+
+    return None
+
+
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -333,6 +358,17 @@ async def chat_completions(request: Request) -> Response:
             error_type="invalid_request_error",
             param=None,
             code="invalid_json",
+        )
+
+    invalid_payload = validate_chat_completion_payload(payload)
+    if invalid_payload is not None:
+        message, param = invalid_payload
+        return openai_error_response(
+            status_code=400,
+            message=message,
+            error_type="invalid_request_error",
+            param=param,
+            code="invalid_request",
         )
 
     request_result = scanner.scan_request(payload)

@@ -1,16 +1,44 @@
-# Python-generated files
+# Deny by default at the repository root.
+/*
+
+# Application and test source.
+!/app/
+!/tests/
+!/examples/
+
+# Project metadata and runtime entrypoints.
+!/.env.example
+!/.github/
+!/.github/workflows/
+!/.github/workflows/tests.yml
+!/.gitignore
+!/.python-version
+!/CHANGELOG.md
+!/Dockerfile
+!/README.md
+!/docker-compose.yml
+!/main.py
+!/opencode.json
+!/pyproject.toml
+!/uv.lock
+
+# Local environment and secrets.
+.env
+.env.*
+!.env.example
+.venv/
+
+# Python-generated files.
 __pycache__/
 *.py[oc]
 .pytest_cache/
-.DS_Store
 *.egg-info/
+
+# Build artifacts and local data.
 build/
 dist/
 wheels/
 data/
-.env
-.env.*
-!.env.example
 
-# Virtual environments
-.venv
+# OS/editor noise.
+.DS_Store

@@ -57,7 +57,7 @@ Audit events are written to `./data/audit.jsonl` when using `.env.example`.
 - API: `POST /v1/chat/completions` only
 - Provider: OpenAI-compatible HTTP API only
 - Audit log: JSONL by default at `/data/audit.jsonl`
-- Streaming: not supported; `stream: true` returns an OpenAI-compatible error object
+- Streaming: supported for `stream: true` by calling the upstream provider with a non-streaming request, then converting the completed response into OpenAI-compatible SSE chunks.
 - PII detection: Regex email and phone only
 - Secret detection: Regex required, Gitleaks optional and disabled by default
 - Future extension points: Headroom, Presidio, GLiNER, SQLite, PostgreSQL
