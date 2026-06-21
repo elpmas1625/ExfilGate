@@ -1,0 +1,47 @@
+server:
+  host: 0.0.0.0
+  port: 8001
+
+provider:
+  name: headroom
+  base_url: https://api.deepseek.com
+  api_key_env: DEEPSEEK_API_KEY
+  timeout_seconds: 600
+  headroom:
+    enabled: true
+  request_overrides:
+    thinking:
+      type: enabled
+    reasoning_effort: high
+
+audit:
+  type: jsonl
+  path: /data/audit.jsonl
+
+detectors:
+  regex_secrets:
+    enabled: true
+  gitleaks:
+    enabled: true
+    timeout_seconds: 3
+  regex_pii:
+    enabled: true
+
+limits:
+  max_request_bytes: 1048576
+  max_response_bytes: 1048576
+  max_scan_chars: 200000
+
+policy:
+  default_action: allow
+  rules:
+    openai_key: block
+    github_token: block
+    aws_access_key: block
+    aws_secret: block
+    anthropic_key: block
+    deepseek_key: block
+    slack_token: block
+    secret: block
+    email: mask
+    phone: mask

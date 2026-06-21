@@ -1,14 +1,22 @@
 import os
+from pathlib import Path
 from typing import Any, Literal
 
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 from app.config.policy_loader import load_yaml_config
+
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 
 class ServerSettings(BaseModel):
     host: str = "0.0.0.0"
     port: int = 8000
+
+
+class HeadroomSettings(BaseModel):
+    enabled: bool = False
 
 
 class ProviderSettings(BaseModel):
@@ -17,6 +25,7 @@ class ProviderSettings(BaseModel):
     api_key_env: str = "AICF_PROVIDER_API_KEY"
     timeout_seconds: float = 60.0
     request_overrides: dict[str, Any] = Field(default_factory=dict)
+    headroom: HeadroomSettings = Field(default_factory=HeadroomSettings)
 
     @property
     def api_key(self) -> str:
