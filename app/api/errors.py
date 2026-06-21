@@ -42,10 +42,10 @@ def content_blocked_response(direction: str) -> JSONResponse:
     )
 
 
-def upstream_error_response() -> JSONResponse:
+def upstream_error_response(message: str = "Upstream provider request failed.") -> JSONResponse:
     return openai_error_response(
         status_code=502,
-        message="Upstream provider request failed.",
+        message=message,
         error_type="upstream_provider_error",
         param=None,
         code="provider_error",

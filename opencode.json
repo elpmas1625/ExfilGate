@@ -10,11 +10,11 @@
         "chunkTimeout": 600000
       },
       "models": {
-        "qwen3.6-35b-a3b": {
-          "name": "Qwen via ExfilGate"
+        "deepseek-v4-pro": {
+          "name": "DeepSeek V4 Pro via ExfilGate"
         }
       }
     }
   },
-  "model": "exfilgate/qwen3.6-35b-a3b"
+  "model": "exfilgate/deepseek-v4-pro"
 }

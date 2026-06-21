@@ -1,5 +1,5 @@
 import os
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -16,10 +16,11 @@ class ProviderSettings(BaseModel):
     base_url: str = "https://api.openai.com/v1"
     api_key_env: str = "AICF_PROVIDER_API_KEY"
     timeout_seconds: float = 60.0
+    request_overrides: dict[str, Any] = Field(default_factory=dict)
 
     @property
     def api_key(self) -> str:
-        return os.getenv(self.api_key_env) or os.getenv("AICF_PROVIDER_API_KEY", "")
+        return os.getenv(self.api_key_env, "")
 
 
 class AuditSettings(BaseModel):

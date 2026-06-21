@@ -6,7 +6,11 @@ provider:
   name: deepseek
   base_url: https://api.deepseek.com
   api_key_env: DEEPSEEK_API_KEY
-  timeout_seconds: 60
+  timeout_seconds: 600
+  request_overrides:
+    thinking:
+      type: enabled
+    reasoning_effort: high
 
 audit:
   type: jsonl

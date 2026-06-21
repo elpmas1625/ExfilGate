@@ -115,6 +115,8 @@ provider:
 
 Set `AICF_PROVIDER_BASE_URL` when using another OpenAI-compatible provider.
 DeepSeek-specific settings are available in `examples/config.deepseek.yaml`.
+For DeepSeek, set `AICF_CONFIG=examples/config.deepseek.yaml` and put the real
+API key in `DEEPSEEK_API_KEY`; do not put the key itself in `api_key_env`.
 
 The sample request uses a placeholder model name. Replace it with a model
 supported by your provider:
@@ -167,6 +169,14 @@ curl http://localhost:8000/v1/chat/completions \
 
 ```bash
 AICF_PROVIDER_API_KEY=your_key docker compose up --build firewall
+```
+
+For DeepSeek:
+
+```bash
+AICF_CONFIG=examples/config.deepseek.yaml \
+DEEPSEEK_API_KEY=your_deepseek_key \
+docker compose up --build firewall
 ```
 
 The audit log is persisted in the `aicf_data` volume at `/data/audit.jsonl`.

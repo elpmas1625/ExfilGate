@@ -62,9 +62,15 @@ def make_settings(
     max_request_bytes: int = 1048576,
     max_response_bytes: int = 1048576,
     heartbeat_interval_seconds: float = 15.0,
+    request_overrides: dict | None = None,
 ) -> Settings:
     return Settings(
-        provider=ProviderSettings(name="test", base_url="https://example.test/v1", api_key_env="NO_KEY"),
+        provider=ProviderSettings(
+            name="test",
+            base_url="https://example.test/v1",
+            api_key_env="NO_KEY",
+            request_overrides=request_overrides or {},
+        ),
         audit=AuditSettings(path=audit_path),
         detectors=DetectorSettings(
             regex_secrets=EnabledDetectorSettings(enabled=True),
@@ -115,7 +121,12 @@ def test_streaming_request_returns_sse_and_forces_upstream_non_stream(client) ->
 
     response = test_client.post(
         "/v1/chat/completions",
-        json={"model": "test", "messages": [{"role": "user", "content": "hello"}], "stream": True},
+        json={
+            "model": "test",
+            "messages": [{"role": "user", "content": "hello"}],
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        },
     )
 
     assert response.status_code == 200
@@ -123,6 +134,7 @@ def test_streaming_request_returns_sse_and_forces_upstream_non_stream(client) ->
     assert '"content":"ok"' in response.text
     assert "data: [DONE]" in response.text
     assert fake_provider.payload["stream"] is False
+    assert "stream_options" not in fake_provider.payload
 
 
 def test_streaming_request_sends_comment_heartbeat(client_factory, tmp_path) -> None:
@@ -225,6 +237,27 @@ def test_request_pii_is_masked_before_provider(client) -> None:
     assert fake_provider.payload["messages"][0]["content"] == "email [REDACTED:EMAIL]"
 
 
+def test_provider_request_overrides_are_added_to_upstream_payload(client_factory, tmp_path) -> None:
+    settings = make_settings(
+        str(tmp_path / "audit.jsonl"),
+        request_overrides={
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": "high",
+        },
+    )
+    test_client, fake_provider = client_factory(settings=settings)
+
+    response = test_client.post(
+        "/v1/chat/completions",
+        json={"model": "deepseek-v4-pro", "messages": [{"role": "user", "content": "hello"}]},
+    )
+
+    assert response.status_code == 200
+    assert fake_provider.payload["model"] == "deepseek-v4-pro"
+    assert fake_provider.payload["thinking"] == {"type": "enabled"}
+    assert fake_provider.payload["reasoning_effort"] == "high"
+
+
 def test_response_secret_is_blocked(client_factory) -> None:
     provider = FakeProvider(
         response={
@@ -293,6 +326,24 @@ def test_provider_error_json_is_forwarded(client_factory) -> None:
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "invalid_api_key"
+
+
+def test_provider_error_message_is_forwarded_when_json_is_unavailable(client_factory) -> None:
+    provider = ErrorProvider(
+        ProviderError(
+            status_code=502,
+            message="Upstream provider request failed before receiving a response: ConnectError.",
+        )
+    )
+    test_client, _ = client_factory(provider=provider)
+
+    response = test_client.post(
+        "/v1/chat/completions",
+        json={"model": "test", "messages": [{"role": "user", "content": "hello"}]},
+    )
+
+    assert response.status_code == 502
+    assert response.json()["error"]["message"] == "Upstream provider request failed before receiving a response: ConnectError."
 
 
 def test_request_size_limit_returns_413(client_factory, tmp_path) -> None:

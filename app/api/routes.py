@@ -1,4 +1,5 @@
 import asyncio
+from copy import deepcopy
 import json
 import logging
 import time
@@ -216,6 +217,7 @@ async def stream_chat_completions(
     try:
         non_stream_payload = dict(upstream_payload)
         non_stream_payload["stream"] = False
+        non_stream_payload.pop("stream_options", None)
         upstream_task = asyncio.create_task(provider.chat_completions(non_stream_payload))
 
         heartbeat_interval = max(settings.stream.heartbeat_interval_seconds, 0.001)
@@ -285,7 +287,7 @@ async def stream_chat_completions(
             yield sse_data(exc.response_json)
         else:
             yield sse_error(
-                message="Upstream provider request failed.",
+                message=exc.message,
                 error_type="upstream_provider_error",
                 code="provider_error",
             )
@@ -327,6 +329,20 @@ def validate_chat_completion_payload(payload: Any) -> tuple[str, str] | None:
         return ("Message content must be a string or list of content parts.", f"messages.{index}.content")
 
     return None
+
+
+def merge_request_overrides(payload: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    if not overrides:
+        return payload
+
+    merged = deepcopy(payload)
+    for key, value in overrides.items():
+        current_value = merged.get(key)
+        if isinstance(current_value, dict) and isinstance(value, dict):
+            merged[key] = {**current_value, **deepcopy(value)}
+        else:
+            merged[key] = deepcopy(value)
+    return merged
 
 
 @router.get("/health")
@@ -390,6 +406,7 @@ async def chat_completions(request: Request) -> Response:
     upstream_payload = payload
     if request_decision.should_mask:
         upstream_payload = scanner.mask_request(payload, request_result.detections)
+    upstream_payload = merge_request_overrides(upstream_payload, settings.provider.request_overrides)
 
     if payload.get("stream") is True:
         return StreamingResponse(
@@ -420,7 +437,7 @@ async def chat_completions(request: Request) -> Response:
         )
         if exc.response_json is not None:
             return JSONResponse(status_code=exc.status_code, content=exc.response_json)
-        return upstream_error_response()
+        return upstream_error_response(exc.message)
 
     response_size = len(json.dumps(upstream_response, separators=(",", ":")).encode("utf-8"))
     if response_size > settings.limits.max_response_bytes:
