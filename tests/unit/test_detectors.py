@@ -1,3 +1,5 @@
+import subprocess
+
 from app.detectors.gitleaks import GitleaksDetector
 from app.detectors.regex_pii import RegexPIIDetector
 from app.detectors.regex_secret import RegexSecretDetector
@@ -53,3 +55,34 @@ def test_gitleaks_enabled_missing_cli_emits_warning_without_failure(monkeypatch,
 
     assert detector.executable is None
     assert "gitleaks_enabled_but_cli_not_found" in caplog.text
+
+
+def test_gitleaks_detector_reports_secret_when_cli_finds_leak(monkeypatch) -> None:
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return subprocess.CompletedProcess(args, 1, stdout="", stderr="")
+
+    monkeypatch.setattr("app.detectors.gitleaks.shutil.which", lambda _: "gitleaks")
+    monkeypatch.setattr("app.detectors.gitleaks.subprocess.run", fake_run)
+
+    detector = GitleaksDetector(timeout_seconds=1.5)
+    detections = detector.detect("github_pat_11AAAAAAAA0abcdefghijklmnopqrstuvwxyz1234567890")
+
+    assert [detection.type for detection in detections] == ["secret"]
+    assert detections[0].detector == "gitleaks"
+    assert calls[0][0][:4] == ["gitleaks", "detect", "--no-git", "--redact"]
+    assert calls[0][1]["timeout"] == 1.5
+
+
+def test_gitleaks_detector_returns_no_detection_when_cli_finds_no_leak(monkeypatch) -> None:
+    def fake_run(args, **kwargs):
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("app.detectors.gitleaks.shutil.which", lambda _: "gitleaks")
+    monkeypatch.setattr("app.detectors.gitleaks.subprocess.run", fake_run)
+
+    detector = GitleaksDetector()
+
+    assert detector.detect("plain text") == []

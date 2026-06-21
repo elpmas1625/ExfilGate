@@ -15,12 +15,26 @@ def test_empty_config_path_uses_defaults() -> None:
     assert load_yaml_config(None) == {}
 
 
+def test_gitleaks_detector_is_enabled_by_default() -> None:
+    settings = Settings()
+
+    assert settings.detectors.gitleaks.enabled is True
+    assert settings.detectors.gitleaks.timeout_seconds == 3.0
+
+
 def test_default_example_config_uses_generic_openai_compatible_provider() -> None:
     raw = load_yaml_config("examples/config.yaml")
     settings = Settings.model_validate(raw)
 
     assert settings.provider.name == "openai-compatible"
     assert settings.provider.api_key_env == "AICF_PROVIDER_API_KEY"
+
+
+def test_default_example_config_enables_gitleaks() -> None:
+    settings = Settings.model_validate(load_yaml_config("examples/config.yaml"))
+
+    assert settings.detectors.gitleaks.enabled is True
+    assert settings.detectors.gitleaks.timeout_seconds == 3.0
 
 
 def test_example_config_builds_default_policy_actions() -> None:
