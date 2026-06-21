@@ -345,9 +345,30 @@ def merge_request_overrides(payload: dict[str, Any], overrides: dict[str, Any]) 
     return merged
 
 
-@router.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+@router.get("/global/health")
+def health() -> dict[str, Any]:
+    return {"healthy": True, "version": "0.1.0"}
+
+
+@router.get("/global/event")
+async def global_event() -> StreamingResponse:
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            while True:
+                yield ": ping\n\n"
+                await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            pass
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/v1/chat/completions")
